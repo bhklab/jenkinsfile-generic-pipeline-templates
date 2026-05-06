@@ -1,0 +1,131 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  nodeSelector:
+    role: snakemake-exec-big
+  tolerations:
+  - key: "workload"
+    operator: "Equal"
+    value: "snakemake"
+    effect: "NoSchedule"
+  containers:
+  - name: pixi
+    image: nickmess08/pixi-snakemake-agent:linux-amd64
+    imagePullPolicy: Always
+    command: ["cat"]
+    tty: true
+    resources:
+      requests:
+        cpu: "4"
+        memory: "24Gi"
+      limits:
+        cpu: "4"
+        memory: "32Gi"
+"""
+    }
+  }
+
+  parameters {
+    string(name: 'PIPELINE_NAME')
+    string(name: 'RUN_ID')
+    string(name: 'REPO_URL')
+    string(name: 'BRANCH', defaultValue: 'main')
+    string(name: 'CONFIG_PATH', defaultValue: 'config/pipeline.yaml')
+    string(name: 'RESULT_DIR', defaultValue: 'data/results')
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        container('pixi') {
+          sh '''
+            git clone --branch "$BRANCH" "$REPO_URL" repo
+          '''
+        }
+      }
+    }
+
+    stage('Install Pixi Environment') {
+      steps {
+        container('pixi') {
+          sh '''
+            cd repo
+            pixi install --locked || pixi install
+          '''
+        }
+      }
+    }
+
+    stage('Dry Run') {
+      steps {
+        container('pixi') {
+          sh '''
+            cd repo
+            pixi run snakemake \
+              -c 4 \
+              --dryrun \
+              --configfile "$CONFIG_PATH" \
+              --printshellcmds
+          '''
+        }
+      }
+    }
+
+    stage('Run Pipeline') {
+      steps {
+        container('pixi') {
+          sh '''
+            cd repo
+            pixi run snakemake \
+              -c 4 \
+              --configfile "$CONFIG_PATH" \
+              --printshellcmds \
+              --show-failed-logs \
+              --rerun-incomplete
+          '''
+        }
+      }
+    }
+
+    stage('Upload outputs to GCS') {
+      steps {
+        container('pixi') {
+          sh '''
+            cd repo
+
+            echo "Uploading ${RESULT_DIR} to gs://nicholas-testing/pipelines/${PIPELINE_NAME}/${RUN_ID}/"
+
+            if [ ! -d "$RESULT_DIR" ]; then
+              echo "Upload directory does not exist: $RESULT_DIR"
+              exit 1
+            fi
+
+            gcloud storage cp \
+              --recursive \
+              "$RESULT_DIR" \
+              "gs://nicholas-testing/pipelines/${PIPELINE_NAME}/${RUN_ID}/"
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      archiveArtifacts(
+        artifacts: '''
+          repo/.snakemake/log/**/*.log,
+          repo/logs/**/*.log,
+          repo/resources/*.svg,
+          repo/qc/**/*
+        ''',
+        allowEmptyArchive: true,
+        fingerprint: true
+      )
+    }
+  }
+}
