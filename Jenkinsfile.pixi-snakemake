@@ -65,7 +65,8 @@ spec:
     stage('Dry Run') {
       steps {
         container('pixi') {
-          sh '''
+          sh '''#!/usr/bin/env bash
+            set -euo pipefail
             cd repo
             pixi run snakemake \
               -c 4 \
@@ -80,9 +81,9 @@ spec:
     stage('Run Pipeline') {
       steps {
         container('pixi') {
-          sh '''
+          sh '''#!/usr/bin/env bash
             set -euo pipefail
-            
+
             cd repo
             pixi run snakemake \
               -c 4 \
@@ -98,7 +99,7 @@ spec:
     stage('Upload outputs to GCS') {
       steps {
         container('pixi') {
-          sh '''
+          sh '''#!/usr/bin/env bash
             set -euo pipefail
 
             cd repo
