@@ -97,6 +97,8 @@ spec:
       steps {
         container('pixi') {
           sh '''
+            set -euo pipefail
+            
             cd repo
 
             echo "Uploading ${RESULT_DIR} to gs://nicholas-testing/pipelines/${PIPELINE_NAME}/${RUN_ID}/"
