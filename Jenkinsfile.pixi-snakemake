@@ -24,11 +24,11 @@ spec:
       requests:
         cpu: "4"
         memory: "24Gi"
-        ephemeral-storage: "100Gi"
+        ephemeral-storage: "50Gi"
       limits:
         cpu: "4"
         memory: "32Gi"
-        ephemeral-storage: "190Gi"
+        ephemeral-storage: "90Gi"
 """
     }
   }
