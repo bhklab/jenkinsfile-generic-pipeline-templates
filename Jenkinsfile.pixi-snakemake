@@ -2,9 +2,11 @@ pipeline {
   agent {
     kubernetes {
       yaml """
+      cloud 'gke-snakemake'
 apiVersion: v1
 kind: Pod
 spec:
+  serviceAccountName: jenkins-agent-runner
   nodeSelector:
     role: snakemake-exec-big
   tolerations:
