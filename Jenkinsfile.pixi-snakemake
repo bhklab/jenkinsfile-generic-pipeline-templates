@@ -2,6 +2,8 @@ pipeline {
   agent {
     kubernetes {
       cloud 'gke-snakemake'
+      podRetention never()
+      activeDeadlineSeconds 21600
       yaml """
 apiVersion: v1
 kind: Pod
