@@ -1,4 +1,30 @@
+@Library('orcestra-lib') _
+
+def notifyStageSafe(Map args = [:]) {
+  try {
+    notifyStage(args)
+  } catch (notifyErr) {
+    echo "WARNING: Failed to send stage notification: ${notifyErr}"
+  }
+}
+
+def runStageWithNotification(String stageName, Closure body) {
+  notifyStageSafe(stage: stageName, status: 'running')
+
+  try {
+    body()
+    notifyStageSafe(stage: stageName, status: 'succeeded')
+  } catch (err) {
+    notifyStageSafe(stage: stageName, status: 'failed', message: err.toString())
+    throw err
+  }
+}
+
 pipeline {
+  options {
+    timeout(time: 6, unit: 'HOURS')
+  }
+
   agent {
     kubernetes {
       cloud 'gke-snakemake'
@@ -48,9 +74,15 @@ spec:
     stage('Checkout') {
       steps {
         container('pixi') {
-          sh '''
-            git clone --branch "$BRANCH" "$REPO_URL" repo
-          '''
+          script {
+            runStageWithNotification('Checkout') {
+              sh '''#!/usr/bin/env bash
+set -euo pipefail
+
+git clone --branch "$BRANCH" "$REPO_URL" repo
+'''
+            }
+          }
         }
       }
     }
@@ -58,10 +90,16 @@ spec:
     stage('Install Pixi Environment') {
       steps {
         container('pixi') {
-          sh '''
-            cd repo
-            pixi install --locked || pixi install
-          '''
+          script {
+            runStageWithNotification('Install Pixi Environment') {
+              sh '''#!/usr/bin/env bash
+set -euo pipefail
+
+cd repo
+pixi install --locked || pixi install
+'''
+            }
+          }
         }
       }
     }
@@ -69,15 +107,20 @@ spec:
     stage('Dry Run') {
       steps {
         container('pixi') {
-          sh '''#!/usr/bin/env bash
-            set -euo pipefail
-            cd repo
-            pixi run snakemake \
-              -c 4 \
-              --dryrun \
-              --configfile "$CONFIG_PATH" \
-              --printshellcmds
-          '''
+          script {
+            runStageWithNotification('Dry Run') {
+              sh '''#!/usr/bin/env bash
+set -euo pipefail
+
+cd repo
+pixi run snakemake \
+  -c 4 \
+  --dryrun \
+  --configfile "$CONFIG_PATH" \
+  --printshellcmds
+'''
+            }
+          }
         }
       }
     }
@@ -85,17 +128,21 @@ spec:
     stage('Run Pipeline') {
       steps {
         container('pixi') {
-          sh '''#!/usr/bin/env bash
-            set -euo pipefail
+          script {
+            runStageWithNotification('Run Pipeline') {
+              sh '''#!/usr/bin/env bash
+set -euo pipefail
 
-            cd repo
-            pixi run snakemake \
-              -c 4 \
-              --configfile "$CONFIG_PATH" \
-              --printshellcmds \
-              --show-failed-logs \
-              --rerun-incomplete
-          '''
+cd repo
+pixi run snakemake \
+  -c 4 \
+  --configfile "$CONFIG_PATH" \
+  --printshellcmds \
+  --show-failed-logs \
+  --rerun-incomplete
+'''
+            }
+          }
         }
       }
     }
@@ -103,29 +150,45 @@ spec:
     stage('Upload outputs to GCS') {
       steps {
         container('pixi') {
-          sh '''#!/usr/bin/env bash
-            set -euo pipefail
+          script {
+            runStageWithNotification('Upload outputs to GCS') {
+              sh '''#!/usr/bin/env bash
+set -euo pipefail
 
-            cd repo
+cd repo
 
-            echo "Uploading ${RESULT_DIR} to gs://nicholas-testing/pipelines/${PIPELINE_NAME}/${RUN_ID}/"
+echo "Uploading ${RESULT_DIR} to gs://nicholas-testing/pipelines/${PIPELINE_NAME}/${RUN_ID}/"
 
-            if [ ! -d "$RESULT_DIR" ]; then
-              echo "Upload directory does not exist: $RESULT_DIR"
-              exit 1
-            fi
+if [ ! -d "$RESULT_DIR" ]; then
+  echo "Upload directory does not exist: $RESULT_DIR"
+  exit 1
+fi
 
-            gcloud storage cp \
-              --recursive \
-              "$RESULT_DIR" \
-              "gs://nicholas-testing/pipelines/${PIPELINE_NAME}/${RUN_ID}/"
-          '''
+gcloud storage cp \
+  --recursive \
+  "$RESULT_DIR" \
+  "gs://nicholas-testing/pipelines/${PIPELINE_NAME}/${RUN_ID}/"
+'''
+            }
+          }
         }
       }
     }
   }
 
   post {
+    success {
+      script {
+        notifyStageSafe(stage: 'Pipeline', status: 'succeeded')
+      }
+    }
+
+    aborted {
+      script {
+        notifyStageSafe(stage: 'Pipeline', status: 'aborted', message: 'Pipeline aborted')
+      }
+    }
+
     always {
       archiveArtifacts(
         artifacts: '''
