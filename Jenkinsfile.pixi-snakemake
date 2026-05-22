@@ -1,5 +1,17 @@
 @Library('orcestra-lib') _
 
+def isAbortError(Throwable err) {
+  def name = err.getClass().getName()
+  def message = err.toString()
+
+  return (
+    name.contains('FlowInterruptedException') ||
+    message.contains('FlowInterruptedException') ||
+    message.contains('Aborted by') ||
+    message.contains('Queue task was cancelled')
+  )
+}
+
 def notifyStageSafe(Map args = [:]) {
   try {
     notifyStage(args)
@@ -15,7 +27,12 @@ def runStageWithNotification(String stageName, Closure body) {
     body()
     notifyStageSafe(stage: stageName, status: 'succeeded')
   } catch (err) {
-    notifyStageSafe(stage: stageName, status: 'failed', message: err.toString())
+    if (isAbortError(err)) {
+      echo "Stage '${stageName}' was aborted; skipping failed stage notification."
+    } else {
+      notifyStageSafe(stage: stageName, status: 'failed', message: err.toString())
+    }
+
     throw err
   }
 }
