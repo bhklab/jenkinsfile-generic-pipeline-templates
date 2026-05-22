@@ -18,8 +18,8 @@ metadata:
     app: jenkins-agent
     workload: snakemake
   annotations:
-    orcestra/pipeline-name: "\${PIPELINE_NAME}"
-    orcestra/run-id: "\${RUN_ID}"
+    orcestra/pipeline-name: "${params.PIPELINE_NAME}"
+    orcestra/run-id: "${params.RUN_ID}"
 spec:
   serviceAccountName: jenkins-agent-runner
   nodeSelector:
