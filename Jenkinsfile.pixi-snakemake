@@ -7,7 +7,7 @@ String cpuRequest = useLargeMachine ? '7' : '3'
 String cpuLimit = useLargeMachine ? '8' : '4'
 
 String memoryRequest = useLargeMachine ? '24Gi' : '13Gi'
-String memoryLimit = useLargeMachine ? '30Gi' : '15Gi'
+String memoryLimit = useLargeMachine ? '30Gi' : '14Gi'
 
 String ephermeralRequest = '130Gi' // Both machine types can have the same ephemeral storage request
 String ephermeralLimit = '190Gi' // Both machine types can have the same ephemeral storage limit
