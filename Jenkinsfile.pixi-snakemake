@@ -1,5 +1,17 @@
 @Library('orcestra-lib') _
 
+boolean useLargeMachine = params.LARGE_MACHINE_USE as boolean
+
+String nodeRole = useLargeMachine ? 'snakemake-exec-big' : 'snakemake-exec-small'
+String cpuRequest = useLargeMachine ? '8' : '4'
+String cpuLimit = useLargeMachine ? '8' : '4'
+
+String memoryRequest = useLargeMachine ? '24Gi' : '15Gi'
+String memoryLimit = useLargeMachine ? '32Gi' : '16Gi'
+
+String ephermeralRequest = '130Gi' // Both machine types can have the same ephemeral storage request
+String ephermeralLimit = '170Gi' // Both machine types can have the same ephemeral storage limit
+
 pipeline {
   options {
     timeout(time: 6, unit: 'HOURS')
@@ -23,7 +35,7 @@ metadata:
 spec:
   serviceAccountName: jenkins-agent-runner
   nodeSelector:
-    role: snakemake-exec-big
+    role: ${nodeRole}
   tolerations:
   - key: "workload"
     operator: "Equal"
@@ -37,13 +49,13 @@ spec:
     tty: true
     resources:
       requests:
-        cpu: "4"
-        memory: "24Gi"
-        ephemeral-storage: "50Gi"
+        cpu: ${cpuRequest}
+        memory: ${memoryRequest}
+        ephemeral-storage: ${ephermeralRequest}
       limits:
-        cpu: "4"
-        memory: "32Gi"
-        ephemeral-storage: "90Gi"
+        cpu: ${cpuLimit}
+        memory: ${memoryLimit}
+        ephemeral-storage: ${ephermeralLimit}
 """
     }
   }
@@ -65,6 +77,7 @@ spec:
     text(name: 'PIPELINE_RUN_COMMAND', defaultValue: '')
     text(name: 'QC_COMMAND', defaultValue: '')
     string(name: 'QC_OUTPUT_DIRECTORY', defaultValue: '')
+    booleanParam(name: 'LARGE_MACHINE_USE', defaultValue: false, description: 'Use the larger GKE burst node pool')
   }
 
   stages {
@@ -89,7 +102,7 @@ spec:
 
   aborted {
     script {
-      def abortedStage = env.CURRENT_PIPELINE_STAGE ?: 'Pipeline'
+      String abortedStage = env.CURRENT_PIPELINE_STAGE ?: 'Pipeline'
       notifyStageSafe(
         stage: abortedStage,
         status: 'aborted',
