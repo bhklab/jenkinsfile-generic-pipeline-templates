@@ -114,14 +114,6 @@ spec:
     always {
       archiveArtifacts(
         artifacts: '''
-          repo/.snakemake/log/**/*.log,
-          repo/logs/**/*.log,
-          repo/resources/*.svg,
-          repo/qc/**/*,
-          repo/**/qc/**/*,
-          repo/**/*.html,
-          repo/**/*.tsv,
-          repo/**/*.csv
         ''',
         allowEmptyArchive: true,
         fingerprint: true
