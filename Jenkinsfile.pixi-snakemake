@@ -114,6 +114,7 @@ spec:
     always {
       archiveArtifacts(
         artifacts: '''
+        .snakemake/log/*.log,
         ''',
         allowEmptyArchive: true,
         fingerprint: true
