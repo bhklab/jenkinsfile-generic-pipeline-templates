@@ -76,7 +76,6 @@ spec:
 
     text(name: 'PIPELINE_RUN_COMMAND', defaultValue: '')
     text(name: 'QC_COMMAND', defaultValue: '')
-    string(name: 'QC_OUTPUT_DIRECTORY', defaultValue: '')
     booleanParam(name: 'LARGE_MACHINE_USE', defaultValue: false, description: 'Use the larger GKE burst node pool')
   }
 
